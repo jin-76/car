@@ -1,0 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+torchaudio==2.11.0+cu128
+ultralytics==8.4.50
+lap==0.5.13
+opencv-python==4.13.0.92
+opencv-contrib-python==4.10.0.84
+paddleocr==3.5.0
+paddlepaddle==3.3.1

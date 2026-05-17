@@ -1,0 +1,47 @@
+{
+  "source": "E:\\pywork\\x-ii\\movie\\Scenario 2\\Drone\\Drone_2_with_fall.MP4",
+  "frame_size": [
+    1920,
+    1080
+  ],
+  "homography": {
+    "image_points": [
+      [
+        152,
+        734
+      ],
+      [
+        1001,
+        17
+      ],
+      [
+        555,
+        1044
+      ],
+      [
+        1304,
+        117
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        14,
+        0
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        14,
+        5
+      ]
+    ],
+    "needs_world_points": false
+  }
+}
