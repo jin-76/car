@@ -1,0 +1,373 @@
+应用介绍
+========
+
+一、应用概述
+------------
+
+当前安装包输出目录为：
+
+E:\pywork\x-ii\installer\output
+
+该目录下有三个文件：
+
+1. SII_Traffic_App_Setup.exe
+2. SII_Traffic_App_Setup-1.bin
+3. SII_Traffic_App_Setup-2.bin
+
+这是 Inno Setup 生成的分卷安装包。安装后的软件是一个 Windows 桌面应用，界面程序为 SII_Traffic_App.py，核心识别程序为 car_speedup.exe。应用用于对交通视频进行车辆监控、车牌识别、超速检测、违停检测、停车场剐蹭检测、人车疑似碰撞检测、火焰/烟雾检测，并可保存日志和标注视频。
+
+
+二、安装包里面的三个文件分别是什么
+----------------------------------
+
+1. SII_Traffic_App_Setup.exe
+
+这是安装启动程序，也就是用户双击运行的安装器。它体积较小，当前约 2.45 MB，主要包含安装逻辑、安装向导界面、安装配置、文件解包入口、快捷方式创建逻辑等。
+
+用户安装软件时应双击这个文件，而不是双击 .bin 文件。
+
+2. SII_Traffic_App_Setup-1.bin
+
+这是安装包的第一个数据卷，当前约 2.0 GB。因为安装内容很大，Inno Setup 开启了 DiskSpanning 分卷，因此主体数据被拆到 .bin 文件中。该文件主要承载 Python 运行环境、C++ 运行文件、模型文件、依赖 DLL、测试视频等大型资源。
+
+3. SII_Traffic_App_Setup-2.bin
+
+这是安装包的第二个数据卷，当前约 26.5 MB。它是第一个数据卷放不下后的续卷，保存剩余安装数据。
+
+注意：这三个文件必须放在同一个目录中。安装时只运行 SII_Traffic_App_Setup.exe，安装器会自动读取旁边的 SII_Traffic_App_Setup-1.bin 和 SII_Traffic_App_Setup-2.bin。如果缺少任意 .bin 文件，安装过程会失败或提示找不到数据文件。
+
+
+三、安装目标位置
+----------------
+
+根据 installer\SII_Traffic_App.iss，默认安装目录为：
+
+%LOCALAPPDATA%\Programs\ai车辆监控哨兵
+
+也就是通常类似：
+
+C:\Users\用户名\AppData\Local\Programs\ai车辆监控哨兵
+
+安装包使用 lowest 权限，不要求管理员权限。安装时可以选择是否创建桌面图标。开始菜单快捷方式和桌面快捷方式会调用：
+
+{app}\.venv-gpu\pythonw.exe "{app}\sii-exe\SII_Traffic_App.py"
+
+其中 {app} 表示实际安装目录。
+
+
+四、安装后软件的文件与文件夹结构
+--------------------------------
+
+安装后的主要目录结构如下：
+
+安装目录
+|
+|-- .venv-gpu/
+|   随软件携带的 Python 运行环境。GUI 程序使用其中的 pythonw.exe 启动。安装包不是要求用户自己安装 Python，而是把必要的 Python 运行时和部分 site-packages 一起打包。
+|
+|   主要内容包括：
+|   |-- python.exe
+|   |-- pythonw.exe
+|   |-- python311.dll
+|   |-- Library/
+|   |   Conda/Python 运行库目录，包含 Tcl/Tk 等 GUI 运行所需组件。
+|   |-- Lib/site-packages/cv2/
+|   |   OpenCV Python 包。
+|   |-- Lib/site-packages/PIL/
+|   |   Pillow 图像处理库。
+|   |-- Lib/site-packages/numpy/
+|   |   NumPy 数值计算库。
+|   |-- Lib/site-packages/numpy.libs/
+|   |   NumPy 依赖 DLL。
+|   |-- Lib/site-packages/pillow.libs/
+|       Pillow 依赖 DLL。
+|
+|-- sii-exe/
+|   应用界面目录。
+|   |-- SII_Traffic_App.py
+|   |   桌面 GUI 主程序。负责显示界面、收集参数、启动 C++ 推理程序、读取日志、更新指标。
+|   |-- app.ico
+|   |   应用图标。
+|   |-- logs/
+|       运行日志目录。每次点击开始识别后，会生成 run_时间戳.txt，并在启用保存日志时生成 plates_时间戳.csv、speed_时间戳.csv、parking_时间戳.csv、fire_时间戳.csv、collision_时间戳.csv 等。
+|
+|-- speedup-c/
+|   C++ 加速识别程序和模型目录。
+|   |-- build-release/Release/
+|   |   核心可执行文件和运行库目录。
+|   |   |-- car_speedup.exe
+|   |   |   安装后真正执行 AI 推理和视频处理的核心程序。
+|   |   |-- *.dll
+|   |       OpenCV、ONNX Runtime、CUDA/cuDNN、Paddle Inference 等运行库。安装脚本把 Release 目录整体复制，确保 car_speedup.exe 能找到依赖。
+|   |
+|   |-- models/
+|   |   C++ 程序使用的模型目录。
+|   |   |-- vehicle_yolo.onnx
+|   |   |   车辆/行人/交通灯等通用目标检测模型。
+|   |   |-- plate_yolo.onnx
+|   |   |   车牌检测模型。
+|   |   |-- fire_smoke.onnx
+|   |   |   火焰/烟雾检测模型。
+|   |   |-- ocr/
+|   |       PaddleOCR 文字识别模型目录。GUI 默认指向 speedup-c\models\ocr\ch_PP-OCRv4_rec_infer。
+|   |
+|   |-- trt-cache-fp16/
+|       TensorRT FP16 引擎缓存目录。安装包会复制当前已生成的缓存，减少首次运行时构建 TensorRT engine 的等待时间。
+|
+|-- movie/
+|   随安装包携带的测试视频目录。安装脚本会复制以下视频：
+|   |-- Traffic IP Camera video[Gr0HpDM8Ki8].mp4
+|   |   交通路口测试视频。安装脚本会把源码中的 Traffic IP Camera video[Gr0HpDM8Ki8].fixed.mp4 改名复制为该文件。
+|   |-- Car Catches on Fire at Witchita Apartment Parking Lot [oQmCTmGlwgA].mp4
+|   |   火灾/烟雾检测测试视频。
+|   |-- Video Project 10.mp4
+|   |   测试视频，通常用于交通或停车相关场景。
+|   |-- Car Accident in Parking Lot Captured by SentriForce [X4qMykwdxNo] 480p.mp4
+|       停车场事故/剐蹭检测测试视频。
+|
+|-- runs/
+|   运行数据和标定文件目录。
+|   |-- annotations/
+|       标定 JSON 目录。安装脚本会复制源码 runs\annotations\*.json。GUI 会根据视频文件名自动匹配预置标定，例如 preset_traffic_gr0.json、preset_witchita_fire.json、preset_video_project_9.json、preset_sentri_force_collision.json 等。
+
+
+五、安装后各个文件与文件夹的用处
+--------------------------------
+
+1. .venv-gpu/
+
+用途是让应用在没有外部 Python 环境的电脑上也能启动。GUI 使用 pythonw.exe 运行，避免弹出控制台窗口。该环境只打包了应用 GUI 需要的 Python 包和基础运行库；大型推理主要由 C++ 程序承担。
+
+2. sii-exe/SII_Traffic_App.py
+
+这是软件的主界面文件。用户看到的窗口、按钮、路径选择、参数设置、开始/停止、日志展示、事件统计都在这里实现。它不直接执行深度学习推理，而是作为调度器调用 car_speedup.exe。
+
+3. sii-exe/app.ico
+
+应用图标。安装器、卸载信息、开始菜单快捷方式和桌面快捷方式都使用它。
+
+4. sii-exe/logs/
+
+运行结果日志目录。每次运行都会保存 stdout 日志，方便追踪 C++ 程序实际执行命令、进度、FPS、事件信息和异常信息。启用保存日志时，还会保存不同类型事件的 CSV 文件。
+
+5. speedup-c/build-release/Release/car_speedup.exe
+
+核心识别程序。它负责打开视频、加载模型、运行 AI 推理、跟踪车辆、识别车牌、判断事件、显示 OpenCV 预览窗口、保存视频和日志。GUI 只是启动和监控它。
+
+6. speedup-c/build-release/Release/*.dll
+
+car_speedup.exe 所需的动态链接库，包括 OpenCV 视频读取和显示库、ONNX Runtime GPU 库、CUDA/cuDNN 相关库、Paddle Inference 库等。如果这些 DLL 缺失，核心程序可能无法启动或无法读取视频/运行模型。
+
+7. speedup-c/models/
+
+模型目录。C++ 程序默认从这里读取模型：
+
+- vehicle_yolo.onnx：车辆、行人、交通灯等通用目标检测。
+- plate_yolo.onnx：车牌检测。
+- fire_smoke.onnx：火焰/烟雾检测。
+- ocr/ch_PP-OCRv4_rec_infer：PaddleOCR 文字识别模型。
+
+8. speedup-c/trt-cache-fp16/
+
+TensorRT 缓存目录。使用 TensorRT FP16 时，ONNX Runtime 会把 ONNX 模型构建为 TensorRT engine。缓存存在时，后续启动可以直接加载 engine，速度更稳定。
+
+9. movie/
+
+随包测试视频目录。GUI 启动后默认选择交通路口测试视频。用户也可以手动选择其他视频。对于随包视频，GUI 会根据文件名自动匹配标定 JSON 和部分检测模式。
+
+10. runs/annotations/
+
+道路标定目录。测速、停车区域、透视矫正等依赖这些 JSON 文件。GUI 选择视频后，会先尝试按视频文件名匹配预置标定；若没有预置标定，则尝试寻找同源视频最近生成的标定文件。
+
+
+六、应用运行流程分析
+--------------------
+
+安装后用户启动软件的流程如下：
+
+1. 用户从开始菜单或桌面快捷方式启动应用
+
+快捷方式实际执行：
+
+.venv-gpu\pythonw.exe sii-exe\SII_Traffic_App.py
+
+pythonw.exe 用于启动 GUI，不显示命令行窗口。
+
+2. GUI 初始化
+
+SII_Traffic_App.py 计算安装根目录，设置默认路径：
+
+- 默认视频：movie\Traffic IP Camera video[Gr0HpDM8Ki8].mp4
+- C++ 程序：speedup-c\build-release\Release\car_speedup.exe
+- 车辆模型：speedup-c\models\vehicle_yolo.onnx
+- 车牌模型：speedup-c\models\plate_yolo.onnx
+- 火焰烟雾模型：speedup-c\models\fire_smoke.onnx
+- OCR 模型：speedup-c\models\ocr\ch_PP-OCRv4_rec_infer
+- TensorRT 缓存：speedup-c\trt-cache-fp16
+- 日志目录：sii-exe\logs
+
+3. GUI 加载预设配置
+
+程序根据视频文件名查找预设标定。比如交通路口视频会匹配 preset_traffic_gr0.json，火灾视频会匹配 preset_witchita_fire.json，停车场事故视频会匹配 preset_sentri_force_collision.json。这样用户选择随包视频后，不需要重新手动画线或做透视标定。
+
+4. 用户设置参数
+
+用户可以在界面上调整：
+
+- 视频源
+- C++ 程序路径
+- 车辆/车牌/火焰模型路径
+- OCR 模型路径
+- 推理后端：CUDA 或 TensorRT
+- 是否启用 FP16
+- OCR 频率
+- 车辆检测频率
+- 预览刷新频率
+- 限速阈值
+- 是否保存日志
+- 是否保存标注视频
+- 是否开启碰撞检测、停车场剐蹭检测、企业微信机器人通知等
+
+5. 点击开始识别
+
+GUI 调用 _validate() 检查视频、模型、OCR 目录、标定文件和数字参数是否有效。检查通过后，创建本次运行日志文件，并根据界面参数拼接 car_speedup.exe 命令行。
+
+6. 配置子进程环境
+
+GUI 在启动 car_speedup.exe 前会设置 PATH，把以下目录加入运行环境：
+
+- TensorRT 目录
+- OpenCV DLL 目录
+- C++ Release 目录
+- Python 环境中可能需要的 DLL 目录
+
+如果启用了企业微信机器人通知，GUI 会把 webhook 写入 SII_NOTIFY_WEBHOOK 环境变量，C++ 程序通过环境变量读取。
+
+7. 启动 car_speedup.exe
+
+GUI 使用 subprocess.Popen 启动核心程序，并隐藏控制台窗口。stdout 和 stderr 会被合并读取。GUI 一边把原始输出写入 sii-exe\logs\run_时间戳.txt，一边解析输出内容更新界面。
+
+8. car_speedup.exe 处理视频
+
+核心程序执行以下步骤：
+
+- 打开视频文件或摄像头。
+- 加载 vehicle_yolo.onnx 做车辆/行人/交通灯等检测。
+- 加载 plate_yolo.onnx 做车牌检测。
+- 加载 fire_smoke.onnx 做火焰/烟雾检测。
+- 加载 PaddleOCR 模型做车牌文字识别。
+- 读取标定 JSON，获取检测线、透视矫正点和道路实际尺寸。
+- 逐帧读取视频，根据 vehicle-every 控制车辆检测频率。
+- 对检测结果做目标跟踪，给车辆和行人分配 ID。
+- 按 ocr-every 对车牌区域做 OCR，并把车牌结果绑定到车辆 ID。
+- 根据车辆轨迹、检测线或透视坐标计算速度。
+- 根据车辆静止时间判断疑似违停。
+- 根据车辆间距离和接触状态判断停车场剐蹭。
+- 根据行人与车辆接触状态判断疑似人车伤人事故。
+- 按 fire-every-sec 检测火焰/烟雾事件。
+- 绘制检测框、ID、车牌、速度、告警状态和检测线。
+- 显示 OpenCV 预览窗口，必要时保存标注视频。
+- 输出事件日志和性能统计。
+
+9. GUI 解析运行输出
+
+GUI 根据固定文本格式解析核心程序输出，例如：
+
+- Processed 100/1000 frames：更新进度。
+- Vehicle YOLO: ... FPS：更新车辆检测速度。
+- Plate YOLO: ... FPS：更新车牌检测速度。
+- PaddleOCR: ... ms/call：更新 OCR 耗时。
+- Total pipeline: ... FPS：更新总处理速度。
+- Plate frame=... id=... text=...：更新最新车牌。
+- Speeding id=... speed=...：更新超速事件。
+- Parking id=...：更新违停事件。
+- ParkingCollision event=suspected_scratch：更新疑似剐蹭事件。
+- Collision event=suspected_accident：更新疑似伤人事件。
+- Fire incident start ...：更新火灾事件。
+
+10. GUI 嵌入预览窗口
+
+car_speedup.exe 会创建名为 car_speedup 的 OpenCV 窗口。GUI 通过 Windows API 查找该窗口句柄，并把它嵌入到界面的视频区域。这样用户看到的是一个统一的桌面控制台，而不是分散的多个窗口。
+
+11. 保存日志与输出
+
+如果启用保存日志，本次运行会在 sii-exe\logs 中保存：
+
+- run_时间戳.txt：完整运行输出。
+- plates_时间戳.csv：车牌识别记录。
+- speed_时间戳.csv：测速和超速记录。
+- parking_时间戳.csv：违停记录。
+- fire_时间戳.csv：火焰/烟雾记录。
+- collision_时间戳.csv：碰撞或剐蹭记录。
+- annotated_时间戳.mp4：如果勾选保存视频，则保存标注视频。
+
+12. 停止或结束
+
+用户点击停止时，GUI 会向 car_speedup.exe 发送停止信号。视频自然处理完或进程退出后，GUI 恢复开始按钮，停止按钮置灰，并在控制台显示日志保存位置。
+
+
+七、安装包打包逻辑分析
+----------------------
+
+安装包由 installer\SII_Traffic_App.iss 生成。关键打包逻辑如下：
+
+1. 应用名称和版本
+
+AppName 为 ai车辆监控哨兵，AppVersion 为 1.0.0。
+
+2. 默认安装目录
+
+DefaultDirName={localappdata}\Programs\ai车辆监控哨兵。
+
+3. 分卷设置
+
+DiskSpanning=yes，DiskSliceSize=2100000000。因为安装内容超过单文件容量限制或为了方便分发，安装包被拆成一个 .exe 和两个 .bin。
+
+4. 打包 GUI
+
+复制 sii-exe\SII_Traffic_App.py 和 sii-exe\app.ico 到安装目录的 sii-exe/。
+
+5. 打包 Python 环境
+
+复制 .venv-gpu 的基础运行环境，并排除 __pycache__、pyc、pdb、测试文件、pip/wheel 等不必要文件。同时单独复制 cv2、PIL、numpy、numpy.libs、pillow.libs 等 GUI 需要的包。
+
+6. 打包 C++ 程序和模型
+
+复制 speedup-c\build-release\Release\*、speedup-c\models\* 和 speedup-c\trt-cache-fp16\*。这部分是安装包体积最大的来源之一。
+
+7. 打包测试视频和标定文件
+
+复制 movie/ 中的几个固定测试视频到安装后的 movie/ 目录，并复制 runs\annotations\*.json 到安装后的 runs\annotations/。
+
+8. 创建快捷方式
+
+开始菜单和桌面快捷方式都指向 .venv-gpu\pythonw.exe，参数为 sii-exe\SII_Traffic_App.py，工作目录为安装目录，图标为 app.ico。
+
+9. 安装后启动
+
+安装完成页面可勾选 Launch，安装器会立即运行：
+
+.venv-gpu\pythonw.exe sii-exe\SII_Traffic_App.py
+
+
+八、应用与源码的关系
+--------------------
+
+源码项目中：
+
+- traffic_mvp.py 是 Python 版算法主流程，便于研究和调试。
+- speedup-c/src/main.cpp 是 C++ 加速版算法主流程，便于实际应用部署。
+- sii-exe/SII_Traffic_App.py 是 GUI 控制台。
+- installer/SII_Traffic_App.iss 把 GUI、C++ 程序、模型、运行库、测试视频和标定文件打成安装包。
+
+安装后的应用中：
+
+- 用户直接接触的是 SII_Traffic_App.py 打开的桌面界面。
+- 实际做识别的是 car_speedup.exe。
+- 模型从 speedup-c/models/ 读取。
+- 视频从 movie/ 或用户选择路径读取。
+- 标定从 runs/annotations/ 读取。
+- 日志输出到 sii-exe/logs/。
+
+因此，安装包不是单个 exe 程序，而是一个完整运行目录的安装器：它包含 GUI、Python 运行环境、C++ 推理程序、AI 模型、运行库、测试视频和标定文件。
+

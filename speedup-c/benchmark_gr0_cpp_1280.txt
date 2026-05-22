@@ -1,0 +1,18 @@
+﻿C++ realtime benchmark - Traffic IP Camera video [Gr0HpDM8Ki8].mp4
+Date: 2026-05-17
+Input: 1920x1080, 750 frames
+imgsz: 1280
+
+Runtime:
+- Vehicle/person YOLO: ONNX Runtime CUDA, vehicle_yolo.onnx
+- Plate YOLO: ONNX Runtime CUDA, plate_yolo.onnx
+- OCR recognizer: Paddle Inference C++ CPU, ch_PP-OCRv4_rec_infer
+
+FPS results:
+- Vehicle YOLO: 19.1514 FPS, 52.2154 ms/call, calls=750
+- Plate YOLO: 23.1274 FPS, 43.2388 ms/call, calls=750
+- PaddleOCR: 22.4130 FPS, 44.6170 ms/call, calls=1432
+- Total pipeline: 5.52796 FPS, 180.899 ms/frame, frames=750
+
+Note:
+Paddle OCR GPU was attempted, but the downloaded Paddle Inference GPU package requires cudnn64_8.dll. The existing PyTorch CUDA runtime provides cuDNN 9, so OCR GPU could not run without adding cuDNN 8 to PATH.

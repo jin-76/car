@@ -1,0 +1,69 @@
+{
+  "source": "Traffic IP Camera video[Gr0HpDM8Ki8].mp4",
+  "frame_size": [
+    1920,
+    1080
+  ],
+  "lines": [
+    [
+      [
+        1910,
+        340
+      ],
+      [
+        250,
+        344
+      ]
+    ],
+    [
+      [
+        1876,
+        778
+      ],
+      [
+        296,
+        710
+      ]
+    ]
+  ],
+  "homography": {
+    "image_points": [
+      [
+        410,
+        982
+      ],
+      [
+        1084,
+        982
+      ],
+      [
+        1008,
+        366
+      ],
+      [
+        1458,
+        354
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        3.25,
+        0
+      ],
+      [
+        0,
+        20
+      ],
+      [
+        3.25,
+        20
+      ]
+    ],
+    "needs_world_points": false
+  }
+}

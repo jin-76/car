@@ -2,6 +2,7 @@ import argparse
 import csv
 import json
 import os
+import time
 from pathlib import Path
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -35,6 +36,31 @@ VEHICLE_CLASSES = {"car", "bus", "truck", "motorcycle"}
 PERSON_CLASS = "person"
 LIGHT_CLASS = "traffic light"
 PIL_FONT = None
+
+
+class FpsMeter:
+    def __init__(self):
+        self.total_seconds = 0.0
+        self.count = 0
+
+    def add(self, seconds):
+        self.total_seconds += seconds
+        self.count += 1
+
+    @property
+    def fps(self):
+        return self.count / self.total_seconds if self.total_seconds > 0 else 0.0
+
+    @property
+    def ms(self):
+        return self.total_seconds * 1000.0 / self.count if self.count else 0.0
+
+
+def timed(meter, func):
+    t0 = time.perf_counter()
+    result = func()
+    meter.add(time.perf_counter() - t0)
+    return result
 
 
 def get_pil_font(size=24):
@@ -293,6 +319,14 @@ def speed_status(speed_kmh):
     if speed_kmh <= 40:
         return "\u6ce8\u610f"
     return "\u8fdd\u89c4"
+
+
+def add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, reason):
+    if track_id is None:
+        return
+    reasons = ocr_vehicle_reasons.setdefault(track_id, [])
+    if reason not in reasons:
+        reasons.append(reason)
 
 
 def update_speed_state(
@@ -841,6 +875,14 @@ def main():
     parser.add_argument("--plate-crop-dir", default="", help="Optional directory for plate crops named track_id--index.jpg.")
     parser.add_argument("--plate-crop-every", type=int, default=1, help="Save one plate crop every N frames per tracked vehicle.")
     parser.add_argument("--ocr-every", type=int, default=10, help="Run OCR on plate boxes every N frames.")
+    parser.add_argument("--max-ocr-per-frame", type=int, default=0, help="Maximum OCR calls per OCR frame; 0 means no limit.")
+    parser.add_argument(
+        "--ocr-trigger",
+        choices=["all", "event"],
+        default="event",
+        help="OCR all plate boxes, or only plates attached to violation/incident vehicles.",
+    )
+    parser.add_argument("--benchmark", action="store_true", help="Print per-stage FPS and latency metrics.")
     parser.add_argument(
         "--plate-enhance",
         choices=["none", "basic", "aggressive", "opencv_bicubic_x4"],
@@ -919,6 +961,7 @@ def main():
 
     args.process_every = max(1, args.process_every)
     args.ocr_every = max(1, args.ocr_every)
+    args.max_ocr_per_frame = max(0, args.max_ocr_per_frame)
     args.plate_crop_every = max(1, args.plate_crop_every)
     args.cv_threads = max(0, args.cv_threads)
     args.start_sec = max(0.0, args.start_sec)
@@ -1023,6 +1066,7 @@ def main():
         print(f"Clip: {args.start_sec:.2f}s to {end_text} (frames {start_frame}-{end_frame or 'end'})")
     print(f"YOLO: device={args.device}, imgsz={args.imgsz}, half={args.half}, process_every={args.process_every}")
     print(f"Plate OCR enhancement: {args.plate_enhance}")
+    print(f"Plate OCR trigger: {args.ocr_trigger}, every {args.ocr_every} frame(s)")
     if detection_lines:
         print(f"Detection lines: {len(detection_lines)}")
         for index, line in enumerate(detection_lines, start=1):
@@ -1069,7 +1113,7 @@ def main():
     if args.plate_log:
         plate_log_file = open(args.plate_log, "w", newline="", encoding="utf-8-sig")
         plate_log = csv.writer(plate_log_file)
-        plate_log.writerow(["frame", "time_sec", "text", "confidence", "x1", "y1", "x2", "y2"])
+        plate_log.writerow(["frame", "time_sec", "track_id", "reason", "text", "confidence", "x1", "y1", "x2", "y2"])
 
     speed_log_file = None
     speed_log = None
@@ -1190,6 +1234,10 @@ def main():
         plate_crop_log_file = open(plate_crop_dir / "manifest.csv", "w", newline="", encoding="utf-8-sig")
         plate_crop_log = csv.writer(plate_crop_log_file)
         plate_crop_log.writerow(["track_id", "crop_index", "image", "frame", "time_sec", "text", "confidence", "x1", "y1", "x2", "y2"])
+    vehicle_fps = FpsMeter()
+    plate_fps = FpsMeter()
+    ocr_fps = FpsMeter()
+    total_fps = FpsMeter()
     try:
         while True:
             ret, frame = cap.read()
@@ -1198,19 +1246,23 @@ def main():
 
             frame_index += 1
             processed_frames += 1
+            frame_t0 = time.perf_counter()
             raw_frame = frame.copy()
             should_process = frame_index == 1 or frame_index % args.process_every == 0
             if should_process:
-                results = detector.track(
-                    frame,
-                    conf=0.35,
-                    device=args.device,
-                    imgsz=args.imgsz,
-                    half=args.half,
-                    tracker=args.tracker,
-                    persist=True,
-                    verbose=False,
-                )[0]
+                results = timed(
+                    vehicle_fps,
+                    lambda: detector.track(
+                        frame,
+                        conf=0.35,
+                        device=args.device,
+                        imgsz=args.imgsz,
+                        half=args.half,
+                        tracker=args.tracker,
+                        persist=True,
+                        verbose=False,
+                    )[0],
+                )
                 cached_detections = []
                 for box in results.boxes:
                     cls_id = int(box.cls[0])
@@ -1276,6 +1328,7 @@ def main():
                             ]
                         )
 
+            ocr_vehicle_reasons = {}
             for name, conf, xyxy, track_id in cached_detections:
                 if name in VEHICLE_CLASSES:
                     center = box_center(xyxy)
@@ -1286,6 +1339,7 @@ def main():
                     collision_label = ""
                     if track_id is not None and track_id in collision_labels["vehicle"]:
                         collision_label = f" {collision_labels['vehicle'][track_id]}"
+                        add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, f"collision:{collision_labels['vehicle'][track_id]}")
                     can_track_speed = box_w >= args.speed_min_box and box_h >= args.speed_min_box
                     metric_point = project_ground_point(speed_point, speed_homography)
                     if track_id is not None and can_track_speed:
@@ -1305,6 +1359,7 @@ def main():
                         if parking_state["parking_reported"]:
                             parking_label = " 违停"
                         if parking_state["parking_reported"]:
+                            add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, "parking")
                             parking_label = f" \u8fdd\u505c:{parking_state['plate_text']}" if parking_state["plate_text"] else " \u8fdd\u505c"
                         if parking_event is not None:
                             print(
@@ -1343,6 +1398,8 @@ def main():
                         if state["continuous_speed_kmh"] is not None:
                             continuous_status = speed_status(state["continuous_speed_kmh"])
                             speed_label = f" rt:{state['continuous_speed_kmh']:.1f}km/h {continuous_status}"
+                            if continuous_status == "\u8fdd\u89c4":
+                                add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, "speeding_rt")
                             if continuous_speed_log is not None:
                                 continuous_speed_log.writerow(
                                     [
@@ -1378,7 +1435,11 @@ def main():
                         if state["last_speed_kmh"] is not None and not args.continuous_speed:
                             line_speed_label = f" {state['last_speed_kmh']:.1f}km/h {state['last_speed_status']}"
                             speed_label = f"{speed_label}{line_speed_label}" if speed_label else line_speed_label
+                            if state["last_speed_status"] == "\u8fdd\u89c4":
+                                add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, "speeding")
                         if speed_event is not None:
+                            if speed_event["status"] == "\u8fdd\u89c4":
+                                add_ocr_vehicle_reason(ocr_vehicle_reasons, track_id, "speeding")
                             print(
                                 "Speed "
                                 f"id={track_id} elapsed={speed_event['elapsed_sec']:.2f}s "
@@ -1468,14 +1529,17 @@ def main():
 
             if plate_detector is not None:
                 if should_process:
-                    plate_results = plate_detector.predict(
-                        raw_frame,
-                        conf=args.plate_conf,
-                        device=args.device,
-                        imgsz=args.imgsz,
-                        half=args.half,
-                        verbose=False,
-                    )[0]
+                    plate_results = timed(
+                        plate_fps,
+                        lambda: plate_detector.predict(
+                            raw_frame,
+                            conf=args.plate_conf,
+                            device=args.device,
+                            imgsz=args.imgsz,
+                            half=args.half,
+                            verbose=False,
+                        )[0],
+                    )
                     previous_plate_detections = cached_plate_detections
                     cached_plate_detections = [
                         {
@@ -1485,17 +1549,28 @@ def main():
                         }
                         for box in plate_results.boxes
                     ]
+                ocr_count = 0
                 for plate_detection in cached_plate_detections:
                     plate_conf = plate_detection["conf"]
                     xyxy = plate_detection["box"]
                     plate_text = plate_detection.get("text", "")
                     plate_track_id = track_id_for_plate(xyxy, cached_detections)
+                    ocr_reason = ";".join(ocr_vehicle_reasons.get(plate_track_id, []))
                     recognized_this_frame = False
-                    if ocr is not None and frame_index % args.ocr_every == 0:
-                        new_plate_text = ocr_plate(ocr, crop(raw_frame, xyxy), args.plate_enhance)
+                    can_ocr = (
+                        ocr is not None
+                        and frame_index % args.ocr_every == 0
+                        and (args.max_ocr_per_frame == 0 or ocr_count < args.max_ocr_per_frame)
+                        and (args.ocr_trigger == "all" or bool(ocr_reason))
+                    )
+                    if can_ocr:
+                        new_plate_text = timed(ocr_fps, lambda: ocr_plate(ocr, crop(raw_frame, xyxy), args.plate_enhance))
+                        ocr_count += 1
                         if new_plate_text:
                             plate_text = new_plate_text
                             plate_detection["text"] = plate_text
+                            if plate_track_id is not None:
+                                track_state.setdefault(plate_track_id, default_track_state())["plate_text"] = plate_text
                             recognized_this_frame = True
                     if plate_track_id is not None and plate_crop_dir is not None:
                         last_saved_frame = plate_crop_last_frame.get(plate_track_id, -args.plate_crop_every)
@@ -1523,9 +1598,23 @@ def main():
                     if recognized_this_frame:
                         time_sec = frame_index / fps if fps else 0
                         coords = [int(v) for v in xyxy]
-                        print(f"Plate frame={frame_index} time={time_sec:.2f}s conf={plate_conf:.2f} text={plate_text}")
+                        print(
+                            f"Plate frame={frame_index} time={time_sec:.2f}s "
+                            f"id={plate_track_id if plate_track_id is not None else ''} "
+                            f"reason={ocr_reason or 'all'} conf={plate_conf:.2f} text={plate_text}"
+                        )
                         if plate_log is not None:
-                            plate_log.writerow([frame_index, f"{time_sec:.2f}", plate_text, f"{plate_conf:.3f}", *coords])
+                            plate_log.writerow(
+                                [
+                                    frame_index,
+                                    f"{time_sec:.2f}",
+                                    plate_track_id if plate_track_id is not None else "",
+                                    ocr_reason or "all",
+                                    plate_text,
+                                    f"{plate_conf:.3f}",
+                                    *coords,
+                                ]
+                            )
 
             draw_detection_lines(frame, detection_lines)
 
@@ -1546,6 +1635,8 @@ def main():
 
             if frame_index % 50 == 0:
                 print(f"Processed {frame_index}/{total_frames or '?'} frames")
+
+            total_fps.add(time.perf_counter() - frame_t0)
 
             if args.max_frames and processed_frames >= args.max_frames:
                 break
@@ -1575,6 +1666,11 @@ def main():
         print(f"Done. Wrote {processed_frames} frames to {args.save}")
     else:
         print(f"Done. Processed {processed_frames} frames without writing video.")
+    if args.benchmark:
+        print(f"Vehicle YOLO: {vehicle_fps.fps:.4f} FPS, {vehicle_fps.ms:.4f} ms/call, calls={vehicle_fps.count}")
+        print(f"Plate YOLO: {plate_fps.fps:.4f} FPS, {plate_fps.ms:.4f} ms/call, calls={plate_fps.count}")
+        print(f"PaddleOCR: {ocr_fps.fps:.4f} FPS, {ocr_fps.ms:.4f} ms/call, calls={ocr_fps.count}")
+        print(f"Total pipeline: {total_fps.fps:.4f} FPS, {total_fps.ms:.4f} ms/frame, frames={total_fps.count}")
 
 
 if __name__ == "__main__":

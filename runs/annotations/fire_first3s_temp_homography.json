@@ -1,0 +1,47 @@
+{
+  "source": "E:\\pywork\\x-ii\\runs\\fire_first3s_loop20.mp4",
+  "frame_size": [
+    640,
+    360
+  ],
+  "homography": {
+    "image_points": [
+      [
+        48,
+        340
+      ],
+      [
+        435,
+        337
+      ],
+      [
+        47,
+        124
+      ],
+      [
+        538,
+        94
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        22,
+        0
+      ],
+      [
+        0,
+        24
+      ],
+      [
+        22,
+        24
+      ]
+    ],
+    "needs_world_points": false
+  }
+}

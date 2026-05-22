@@ -1,0 +1,47 @@
+{
+  "source": "E:\\pywork\\x-ii\\movie\\Video Project 9.mp4",
+  "frame_size": [
+    1920,
+    1080
+  ],
+  "homography": {
+    "image_points": [
+      [
+        944,
+        677
+      ],
+      [
+        1224,
+        646
+      ],
+      [
+        889,
+        395
+      ],
+      [
+        1046,
+        387
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        3.5,
+        0
+      ],
+      [
+        0,
+        18.0
+      ],
+      [
+        3.5,
+        18.0
+      ]
+    ],
+    "needs_world_points": false
+  }
+}

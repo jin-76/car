@@ -137,3 +137,32 @@ train           → 火车
 
 model\ocr-model\plate_yolo.pt模型能够检测以下对象
 车牌<--only one object
+
+
+
+
+
+目标检测模型 yolov8n.pt：GPU
+      - 代码里 detector.track(... device=args.device, half=args.half ...)
+      - 默认 --device 0
+      - 当前 PyTorch 能看到：NVIDIA GeForce RTX 3060 Laptop GPU
+  - 车牌检测模型 plate_yolo.pt：GPU
+      - 代码里 plate_detector.predict(... device=args.device, half=args.half ...)
+      - 也是走 Ultralytics/PyTorch，同样用 --device 0
+      - 所以它和目标检测一样是在 RTX 3060 上跑
+  - OCR 文字识别 PaddleOCR：CPU
+      - 当前 paddlepaddle==3.3.1
+      - 检测结果：paddle.device.is_compiled_with_cuda() = False
+      - paddle.device.get_device() = cpu
+      - 所以 PaddleOCR 现在不是 GPU
+
+Homography是 实现监控视角到实际坐标转换，目标全局测速的关键
+中国车牌规则：OCR 结果里的 I/i 在车牌规范化阶段统一改成 1，再参与合法性判断、投票、锁定和显示
+
+最新的c++版实时窗口运行命令
+Ran $env:PATH = "E:\pywork\x-ii\.venv-gpu\Lib\site-packages\torch\lib;E:\pywork\x-ii\speedup-c\third_party\onnxruntime-win-x64-gpu-1.23.2\lib;E:
+  │ \pywork\x-ii\speedup-c\third_party\paddle\lib;E:\pywork\x-ii\speedup-c\third_party\opencv\build\x64\vc16\bin;E:\pywork\x-ii\.venv-gpu\Lib\site-packages\nvidia\cudnn\bin;" +
+  │ $env:PATH
+
+
+  Vehicle YOLO,plate YOLO,

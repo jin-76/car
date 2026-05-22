@@ -1,0 +1,47 @@
+{
+  "source": "E:\\pywork\\x-ii\\downloads\\Car Accident in Parking Lot Captured by SentriForce [X4qMykwdxNo] 480p.mp4",
+  "frame_size": [
+    640,
+    480
+  ],
+  "homography": {
+    "image_points": [
+      [
+        259,
+        433
+      ],
+      [
+        564,
+        338
+      ],
+      [
+        201,
+        323
+      ],
+      [
+        487,
+        259
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        4.8,
+        0
+      ],
+      [
+        0,
+        1.7
+      ],
+      [
+        4.8,
+        1.7
+      ]
+    ],
+    "needs_world_points": false
+  }
+}

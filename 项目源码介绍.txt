@@ -1,0 +1,337 @@
+项目源码介绍
+================
+
+一、项目概述
+------------
+
+当前项目位于 E:\pywork\x-ii，是一个面向交通监控视频的 AI 识别项目。源码侧主要包含两条路线：
+
+1. Python 原型路线：以 traffic_mvp.py 为核心，使用 Ultralytics YOLO、ByteTrack、PaddleOCR、OpenCV 完成车辆/行人/交通灯/车牌识别、测速、违停、疑似碰撞、车牌 OCR 等功能。
+2. C++ 加速路线：位于 speedup-c/，将车辆检测、车牌检测、火焰烟雾检测和 OCR 推理迁移到 C++ 程序 car_speedup.exe，使用 ONNX Runtime CUDA/TensorRT、Paddle Inference 和 OpenCV 提高运行速度。安装包内的桌面应用主要调用这条路线。
+
+项目还包含训练数据、模型文件、测试视频、运行结果、安装包脚本和安装包输出。
+
+
+二、当前项目的文件与文件夹结构
+------------------------------
+
+E:\pywork\x-ii
+|
+|-- .git/
+|   Git 版本库目录，用于记录项目历史。普通使用和交付时不需要进入。
+|
+|-- .paddlex-cache/
+|   PaddleOCR/PaddleX 的本地模型缓存目录。项目把缓存放在本目录下，避免默认写入用户目录时出现权限或路径问题。
+|
+|-- .ultralytics/
+|   Ultralytics YOLO 的本地配置与缓存目录，例如 settings.json、字体文件、持久化缓存等。
+|
+|-- .venv-gpu/
+|   项目专用 Python 运行环境。里面包含 python.exe、pythonw.exe、OpenCV、Pillow、NumPy、Ultralytics、PaddleOCR 等依赖。源码开发、Python 脚本运行和安装包 GUI 启动都依赖该环境。
+|
+|-- .vscode/
+|   VS Code 配置目录，保存编辑器设置。
+|
+|-- downloads/
+|   下载素材或临时下载文件目录。项目中曾用于保存视频、数据或其他外部资源。
+|
+|-- installer/
+|   安装包工程目录。
+|   |-- SII_Traffic_App.iss
+|   |   Inno Setup 打包脚本，定义应用名称、版本、安装目录、打包文件、快捷方式和安装后启动命令。
+|   |-- output/
+|       安装包输出目录，当前包含 SII_Traffic_App_Setup.exe、SII_Traffic_App_Setup-1.bin、SII_Traffic_App_Setup-2.bin 三个安装文件。
+|
+|-- model/
+|   模型和训练数据目录。
+|   |-- obj-det-model/
+|   |   通用目标检测模型目录，当前包含 yolov8n.pt，用于车辆、行人、交通灯等通用目标检测。
+|   |-- ocr-model/
+|   |   车牌检测模型目录，当前包含 plate_yolo.pt，用于从车辆画面中定位车牌区域。
+|   |-- fire-smoth-model/
+|       火焰/烟雾检测数据与模型目录，包含 data.yaml、train/、valid/、test/、model/ 等，用于训练和保存火焰烟雾检测模型。
+|
+|-- movie/
+|   输入视频与测试视频目录。项目中的交通监控、火灾、停车场事故等测试视频放在这里。安装包会随包携带部分测试视频到安装后的 movie/ 目录。
+|
+|-- picture/
+|   图片素材目录，通常用于界面、测试截图或其他静态图片资源。
+|
+|-- runs/
+|   程序运行输出目录。包括标注视频、CSV 日志、测速/违停/碰撞/车牌识别结果、车牌裁剪图、标定 JSON、训练结果等。
+|   |-- annotations/
+|       道路检测线、透视矫正等标定文件目录。安装包会复制这里的 JSON 文件，供安装后的程序自动匹配测试视频。
+|
+|-- sii-exe/
+|   桌面应用源码与图标目录。
+|   |-- SII_Traffic_App.py
+|   |   Tkinter 桌面应用主程序。它不是主要算法本体，而是图形界面控制器，负责选择视频、模型、参数，启动 C++ 推理程序，读取输出日志并更新界面。
+|   |-- app.ico
+|   |   应用图标，安装包和快捷方式都使用它。
+|   |-- Start_SII_Traffic_App.bat
+|   |   本地启动脚本，优先用 .venv-gpu\pythonw.exe 启动 SII_Traffic_App.py。
+|   |-- Start_SII_Traffic_App.vbs
+|   |   静默启动脚本，通过 Windows Script Host 后台启动 GUI，避免弹出命令行窗口。
+|   |-- logs/
+|       GUI 运行日志目录。每次运行会保存 run_时间戳.txt 以及 plates/speed/parking/fire/collision 等 CSV。
+|
+|-- speedup-c/
+|   C++ 加速版工程目录。
+|   |-- CMakeLists.txt
+|   |   CMake 构建配置。
+|   |-- README.md
+|   |   C++ 推理路线说明，包含模型导出、构建、运行、TensorRT 配置等。
+|   |-- src/
+|   |   C++ 源码目录，main.cpp 是 car_speedup.exe 的主程序。
+|   |-- include/
+|   |   C++ 头文件目录。
+|   |-- scripts/
+|   |   辅助脚本，例如模型导出、依赖下载等。
+|   |-- models/
+|   |   C++ 运行时模型目录。包含 vehicle_yolo.onnx、plate_yolo.onnx、fire_smoke.onnx 和 PaddleOCR 识别模型目录。
+|   |-- build/、build-release/
+|   |   C++ 构建输出目录。build-release\Release\car_speedup.exe 是安装包实际调用的核心推理程序。
+|   |-- third_party/
+|   |   C++ 依赖目录，例如 OpenCV、ONNX Runtime GPU、Paddle Inference、CMake、cuDNN 等。
+|   |-- trt-cache/、trt-cache-fp16/、trt-cache-fp32/
+|       TensorRT 引擎缓存目录。第一次运行 TensorRT 时会构建 engine，后续复用缓存加速启动。
+|
+|-- trash/
+|   旧版本或废弃文件目录。例如旧版 traffic_workbench.py、run_workbench.bat。
+|
+|-- __pycache__/
+|   Python 字节码缓存目录，可删除，不影响源码。
+|
+|-- .gitignore
+|   Git 忽略规则。
+|
+|-- annotate_video_line.py
+|   交互式视频标线工具。读取视频某一帧，让用户手动画检测线或透视矫正四点，并输出 JSON 标定文件。
+|
+|-- bytetrack_custom.yaml
+|   ByteTrack 跟踪器配置，用于 YOLO track 模式给车辆、行人等目标分配稳定 ID。
+|
+|-- cookies.txt、cookies (1).txt
+|   下载在线视频时使用的 cookies 文件，主要供 yt-dlp 一类工具访问视频资源。
+|
+|-- EXPERIMENT_NOTES.md
+|   实验记录文档。
+|
+|-- infer_fire_smoke_1fps_realtime.py
+|   火焰/烟雾检测推理脚本。每秒抽样运行 YOLO，绘制检测框，保存实时速度的视频和 CSV 日志。
+|
+|-- multi_frame_plate_ocr_fusion.py
+|   多帧车牌 OCR 融合脚本。读取按 track_id--index.jpg 命名的车牌裁剪图，对同一车辆 ID 的多帧 OCR 候选做归一化、相似度加权投票，输出融合结果 CSV 和明细 CSV。
+|
+|-- ocr_sr_variants.py
+|   车牌图像增强/OCR 对比脚本。对原图、放大图、增强图等不同版本运行 PaddleOCR，比较哪种图像预处理更适合车牌识别。
+|
+|-- plate_sr_compare.py
+|   车牌裁剪与超分/放大效果对比脚本。从视频中检测车牌并保存原始裁剪图、bicubic 放大图、对比图，用于评估 OCR 输入质量。
+|
+|-- PROJECT_STRUCTURE_AND_STRATEGY.md
+|   项目结构与车牌识别策略说明文档。
+|
+|-- README.md
+|   项目说明文档，包含运行方式、文件用途、环境信息和常用命令。
+|
+|-- requirements-gpu.txt
+|   Python GPU 环境依赖清单。
+|
+|-- run_gpu.bat
+|   Python 主流程启动脚本。设置 Paddle 缓存、线程数，激活 .venv-gpu，然后运行 traffic_mvp.py。
+|
+|-- run_light_gpu.bat
+|   轻量参数启动脚本。相比 run_gpu.bat，默认使用更小 imgsz、更低处理频率、更低输出尺度和更低 OCR 频率，适合资源较紧张时运行。
+|
+|-- traffic_mvp.py
+|   Python 算法主脚本。实现视频读取、YOLO 检测、ByteTrack 跟踪、车牌检测、OCR、测速、违停、碰撞、绘制、保存视频和日志等完整流程。
+|
+|-- train_fire_smoke.py
+|   火焰/烟雾模型训练脚本，基于 yolov8n.pt 启动训练。
+|
+|-- train_fire_smoke_quick.py
+|   火焰/烟雾快速训练脚本，用较短轮数验证训练流程。
+|
+|-- train_fire_smoke_20.py
+|   基于 quick 训练结果继续训练 20 轮的脚本。
+|
+|-- yolo26n.pt
+|   项目根目录中的 YOLO 权重文件，可能是额外实验模型或备用模型。
+
+
+三、主要代码脚本的用途
+----------------------
+
+1. traffic_mvp.py
+
+这是 Python 版核心算法脚本，功能最完整，适合调试算法逻辑。它支持的主要输入参数包括：
+
+- --source：视频路径或摄像头编号。
+- --model：车辆/行人/交通灯等通用目标检测模型。
+- --plate-model：车牌检测模型。
+- --line-json：道路检测线或透视矫正标定文件。
+- --save / --no-save：是否保存标注后视频。
+- --plate-log、--speed-log、--parking-log、--collision-log：各类事件 CSV 输出。
+- --plate-crop-dir：保存车牌裁剪图。
+- --ocr-every、--max-ocr-per-frame：控制 OCR 频率和每帧 OCR 次数。
+- --collision-detect：启用疑似人车碰撞检测。
+- --parking-still-sec、--parking-pixel-thresh：违停判定参数。
+
+2. annotate_video_line.py
+
+交互式标定工具。流程是打开视频，截取指定帧，用户用鼠标点击检测线或透视矫正四点，脚本保存 JSON。traffic_mvp.py 和 C++ 程序读取该 JSON 后，才能根据道路位置做测速、区域判断和透视坐标转换。
+
+3. multi_frame_plate_ocr_fusion.py
+
+离线车牌融合脚本。它读取车牌裁剪图片，根据文件名中的车辆 track_id 分组，对每张图运行 OCR，过滤空结果，归一化文本，然后按置信度和相似度做加权投票。最后输出每个车辆 ID 的融合车牌结果。
+
+4. plate_sr_compare.py
+
+车牌裁剪和图像增强对比脚本。它用 plate_yolo.pt 从视频抽样检测车牌，保存原图和放大图，便于观察小车牌、模糊车牌在 OCR 前应该如何预处理。
+
+5. ocr_sr_variants.py
+
+OCR 变体对比脚本。它读取不同增强版本的车牌图，调用 PaddleOCR，输出识别明细 CSV，用来判断 nearest、bicubic、basic enhance 等处理方式对车牌识别的影响。
+
+6. infer_fire_smoke_1fps_realtime.py
+
+火焰/烟雾推理脚本。它以每秒一次的频率对视频做火焰/烟雾 YOLO 检测，并把上一轮检测框维持显示在中间帧上，从而保证保存视频播放速度接近原视频。
+
+7. train_fire_smoke.py / train_fire_smoke_quick.py / train_fire_smoke_20.py
+
+火焰/烟雾模型训练脚本。它们调用 Ultralytics YOLO 的 train 接口，读取 model/fire-smoth-model/data.yaml 和训练/验证数据，生成 best.pt 等训练结果。
+
+8. sii-exe/SII_Traffic_App.py
+
+桌面 GUI 主程序。它用 Tkinter 搭建界面，默认选择随包测试视频、C++ 可执行文件、ONNX 模型、OCR 模型和标定 JSON。用户点击开始后，它通过 subprocess.Popen 启动 car_speedup.exe，实时读取 stdout，根据固定日志格式解析 FPS、进度、车牌、违停、超速、火灾、剐蹭、疑似伤人等事件，并更新界面指标和日志。
+
+9. speedup-c/src/main.cpp
+
+C++ 加速版主程序。它承担安装包实际运行时的主要算法推理任务，负责读取视频、加载 ONNX/PaddleOCR 模型、调用 CUDA/TensorRT 推理、做目标跟踪、事件判断、画面绘制、日志输出和视频保存。
+
+
+四、Python 主脚本 traffic_mvp.py 的工作流程分析
+-----------------------------------------------
+
+traffic_mvp.py 的典型工作流程如下：
+
+1. 解析命令行参数
+   程序读取输入视频、模型路径、设备编号、图像尺寸、OCR 频率、输出路径、标定 JSON、测速参数、违停参数、碰撞参数等。
+
+2. 初始化模型与资源
+   使用 YOLO(args.model) 加载车辆/行人/交通灯等通用检测模型。如果传入 --plate-model，则再加载车牌检测模型。若没有 --no-ocr 并且 PaddleOCR 可用，则初始化 OCR 识别器。程序还会打开视频源、读取 FPS/分辨率、创建输出视频 writer 和 CSV 日志文件。
+
+3. 读取标定信息
+   如果提供 --line-json，则读取检测线、透视矫正四点、道路实际宽度/长度等信息。测速有两类：一种是车辆穿过两条检测线后按两线实际距离计算速度；另一种是通过 Homography 将图像坐标投影到地面坐标后做连续测速。
+
+4. 逐帧读取视频
+   程序循环读取视频帧。根据 --process-every 控制是否每帧都运行 YOLO，未运行检测的帧会复用上一轮结果以节省算力。
+
+5. 车辆/行人/交通灯检测和跟踪
+   调用 detector.track(...)，使用 ByteTrack 给目标分配 track_id。车辆类别包括 car、bus、truck、motorcycle 等；行人用于疑似人车碰撞；traffic light 会进入交通灯颜色分析。
+
+6. 车牌检测和 OCR
+   如果提供车牌模型，则对当前帧调用 plate_detector.predict(...) 检测车牌框。程序会把车牌框与车辆框做空间绑定：优先选择车牌中心落在车辆框内的结果，否则使用距离最近的车牌。每隔 --ocr-every 帧才对车牌裁剪图做 OCR，低置信度或空结果不会覆盖已有车牌。识别结果会写入 track_state[track_id]["plate_text"]，因此同一车辆 ID 可以在后续帧持续显示已识别车牌。
+
+7. 车牌裁剪图保存
+   如果设置 --plate-crop-dir，则按 track_id--index.jpg 保存车牌裁剪图，并生成 manifest.csv 记录帧号、时间、坐标、OCR 文本等信息。这些图可供 multi_frame_plate_ocr_fusion.py 做离线多帧融合。
+
+8. 测速判断
+   对于线段测速，程序记录车辆进入/离开检测区域的帧号，根据视频 FPS 和实际距离计算 km/h，并过滤过低或过高的不可信速度。对于连续测速，程序用 Homography 将车辆底部中心点转成地面坐标，根据一段时间窗口内的位移计算速度。
+
+9. 违停判断
+   程序维护每个车辆 ID 的位置状态。如果车辆中心点在一定秒数内移动距离低于阈值，则判定疑似违停，并写入 parking CSV。
+
+10. 疑似碰撞判断
+    人车碰撞逻辑会检查行人与车辆前部的距离、接触持续帧数、接触后的静止、姿态变化或消失等状态。停车场剐蹭逻辑则关注两辆车之间的近距离接触、相对运动和持续状态。
+
+11. 火焰/烟雾检测
+    Python 侧有独立脚本 infer_fire_smoke_1fps_realtime.py；安装包 C++ 侧则在 car_speedup.exe 中把火焰/烟雾检测作为额外 YOLO 流处理。
+
+12. 绘制与输出
+    程序把车辆框、ID、速度、车牌、交通灯颜色、检测线、事件状态绘制到画面上。若开启保存，则输出标注视频；若开启预览，则显示 OpenCV 窗口；同时写入各类 CSV 和 stdout 统计信息。
+
+13. 收尾统计
+    视频结束或达到 --max-frames 后，程序关闭资源，输出总帧数、各阶段 FPS、事件数量等统计信息。
+
+
+五、桌面应用 SII_Traffic_App.py 的工作流程分析
+----------------------------------------------
+
+SII_Traffic_App.py 是 GUI 控制层，核心流程如下：
+
+1. 启动时确定路径
+   程序通过 __file__ 得到 APP_DIR=sii-exe，PROJECT_ROOT=上一级目录。随后设置默认视频、C++ 可执行文件、车辆 ONNX 模型、车牌 ONNX 模型、火焰烟雾 ONNX 模型、PaddleOCR 模型、标定 JSON、TensorRT 缓存目录和日志目录。
+
+2. 处理 Tcl/Tk 路径
+   打包后的 Conda/Tkinter 在中文安装路径下可能找不到 init.tcl，因此程序显式设置 TCL_LIBRARY 和 TK_LIBRARY，保证 pythonw.exe 从桌面快捷方式启动时 GUI 能正常打开。
+
+3. 建立界面变量
+   程序用 tk.StringVar、tk.BooleanVar 保存视频路径、模型路径、推理提供者、是否 FP16、是否保存日志、是否保存视频、是否开启 OCR GPU、是否开启碰撞/剐蹭、企业微信机器人 webhook 等配置。
+
+4. 构建界面
+   界面包含视频预览区域、状态指标、事件计数、路径设置、运行参数、开始/停止按钮、日志面板等。它是一个操作台，不直接进行 AI 推理。
+
+5. 启动推理
+   用户点击开始后，start_run() 会先校验文件和参数，然后调用 _build_command() 组装 car_speedup.exe 命令行。例如会传入 --source、--vehicle-model、--plate-model、--ocr-model-dir、--fire-model、--imgsz、--yolo-provider、--trt-cache-dir、--ocr-every、--max-ocr-per-frame、--speed-limit-kmh 等参数。
+
+6. 配置运行环境
+   _make_env() 会把 TensorRT、OpenCV、C++ Release 目录、Python 依赖 DLL 等路径加入 PATH。若启用通知，则把企业微信 webhook 写入 SII_NOTIFY_WEBHOOK 环境变量，避免直接在命令行暴露完整地址。
+
+7. 启动子进程
+   程序通过 subprocess.Popen 启动 car_speedup.exe，并隐藏控制台窗口。stdout 和 stderr 被合并读取，写入 logs/run_时间戳.txt，同时推入队列给 GUI 主线程解析。
+
+8. 解析输出并刷新界面
+   _parse_line() 根据正则表达式解析 C++ 程序输出，例如 Vehicle YOLO FPS、Plate YOLO FPS、PaddleOCR 耗时、Total pipeline FPS、Processed 进度、Events 事件计数、Plate frame 车牌事件、Speeding 超速事件、ParkingCollision 剐蹭事件、Collision 伤人事件、Fire incident 火灾事件等，然后更新界面。
+
+9. 嵌入预览窗口
+   C++ 程序使用 OpenCV 创建名为 car_speedup 的预览窗口。GUI 会尝试找到该窗口句柄，并把它嵌入到 Tkinter 的视频区域中，从而让用户在一个界面里看到实时识别画面。
+
+10. 停止与收尾
+    点击停止时，GUI 会向子进程发送 Ctrl-Break 或 terminate。进程退出后按钮状态恢复，日志路径显示在控制台区域。
+
+
+六、C++ 加速版 speedup-c 的工作流程分析
+---------------------------------------
+
+speedup-c 的目标是替代 Python 实时推理瓶颈。主要流程如下：
+
+1. 模型准备
+   车辆检测模型由 model/obj-det-model/yolov8n.pt 导出为 speedup-c/models/vehicle_yolo.onnx。车牌检测模型由 model/ocr-model/plate_yolo.pt 导出为 speedup-c/models/plate_yolo.onnx。火焰烟雾模型导出为 speedup-c/models/fire_smoke.onnx。OCR 使用 PaddleOCR 推理模型目录。
+
+2. 程序启动
+   car_speedup.exe 读取命令行参数，打开视频源，加载车辆检测、车牌检测、火焰烟雾检测、OCR 模型和标定 JSON。
+
+3. 推理后端
+   YOLO 检测可走 ONNX Runtime CUDA，也可走 TensorRT EP。启用 TensorRT FP16 时会使用 trt-cache-fp16 缓存 engine。OCR 使用 Paddle Inference，可按参数决定 CPU/GPU。
+
+4. 逐帧处理
+   程序读取视频帧，按 vehicle-every 控制车辆检测频率，按 ocr-every 控制 OCR 频率，按 fire-every-sec 控制火焰烟雾检测频率。中间帧可复用上一轮检测结果以降低计算量。
+
+5. 事件判断
+   C++ 程序实现车辆跟踪、测速、违停、停车场剐蹭、人车碰撞、火焰烟雾事件、车牌识别等逻辑，并以固定文本格式输出事件。GUI 正是依靠这些输出格式来刷新界面。
+
+6. 输出
+   程序可显示 OpenCV 实时预览窗口、保存标注视频、保存 CSV 日志，并输出 FPS 和事件数量。安装包 GUI 默认读取这些输出，作为应用前端的数据源。
+
+
+七、运行关系总结
+----------------
+
+开发调试时：
+
+run_gpu.bat -> .venv-gpu -> traffic_mvp.py -> YOLO/PaddleOCR/OpenCV -> runs/ 输出结果
+
+安装包应用运行时：
+
+桌面快捷方式 -> .venv-gpu\pythonw.exe -> sii-exe\SII_Traffic_App.py -> speedup-c\build-release\Release\car_speedup.exe -> ONNX Runtime/TensorRT/Paddle Inference/OpenCV -> sii-exe\logs 和界面显示
+
+离线车牌增强与融合时：
+
+traffic_mvp.py 保存车牌裁剪图 -> multi_frame_plate_ocr_fusion.py / ocr_sr_variants.py -> 输出融合 CSV 或对比 CSV
+
+训练火焰烟雾模型时：
+
+train_fire_smoke*.py -> model/fire-smoth-model/data.yaml -> Ultralytics YOLO train -> runs/detect/ 或 model/fire-smoth-model/model/ 输出训练权重
+

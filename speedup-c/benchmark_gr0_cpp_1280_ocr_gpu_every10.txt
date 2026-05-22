@@ -1,0 +1,24 @@
+﻿C++ realtime benchmark - Traffic IP Camera video [Gr0HpDM8Ki8].mp4
+Date: 2026-05-17
+Input: 1920x1080, 750 frames
+imgsz: 1280
+
+Runtime:
+- Vehicle/person YOLO: ONNX Runtime CUDA, vehicle_yolo.onnx
+- Plate YOLO: ONNX Runtime CUDA, plate_yolo.onnx
+- OCR recognizer: Paddle Inference C++ GPU, ch_PP-OCRv4_rec_infer
+- OCR frequency: every 10 frames
+- Max OCR per frame: 2
+- cuDNN: 8.9, loaded from .venv-gpu\Lib\site-packages\nvidia\cudnn\bin
+
+FPS results:
+- Vehicle YOLO: 26.0822 FPS, 38.3403 ms/call, calls=750
+- Plate YOLO: 31.0990 FPS, 32.1554 ms/call, calls=750
+- PaddleOCR: 64.5509 FPS, 15.4916 ms/call, calls=130
+- Total pipeline: 13.6219 FPS, 73.4110 ms/frame, frames=750
+
+Previous C++ CPU-OCR run:
+- Vehicle YOLO: 19.1514 FPS
+- Plate YOLO: 23.1274 FPS
+- PaddleOCR CPU: 22.4130 FPS
+- Total pipeline: 5.52796 FPS

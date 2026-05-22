@@ -1,0 +1,30 @@
+Python benchmark - Traffic IP Camera video [Gr0HpDM8Ki8].mp4
+Date: 2026-05-17
+Input: 1920x1080, 750 frames
+imgsz: 1280
+
+Command:
+.venv-gpu\python.exe traffic_mvp.py --source "movie\Traffic IP Camera video [Gr0HpDM8Ki8].mp4" --model model\obj-det-model\yolov8n.pt --plate-model model\ocr-model\plate_yolo.pt --device 0 --imgsz 1280 --ocr-every 10 --max-ocr-per-frame 2 --no-save --no-preview --benchmark
+
+Runtime:
+- Vehicle/person YOLO: Ultralytics/PyTorch, yolov8n.pt, device=0
+- Plate YOLO: Ultralytics/PyTorch, plate_yolo.pt, device=0
+- OCR: project original PaddleOCR(lang="ch") Python pipeline, cached PP-OCRv5_server_det + PP-OCRv5_server_rec
+- OCR frequency: every 10 frames
+- Max OCR per frame: 2
+- Save/preview: disabled
+
+FPS results:
+- Vehicle YOLO: 29.8825 FPS, 33.4644 ms/call, calls=750
+- Plate YOLO: 37.6373 FPS, 26.5694 ms/call, calls=750
+- PaddleOCR: 0.4805 FPS, 2081.2155 ms/call, calls=131
+- Total pipeline: 2.2061 FPS, 453.2876 ms/frame, frames=750
+
+Comparison with benchmark_gr0_cpp_1280_ocr_gpu_every10.txt:
+- Vehicle YOLO: Python 29.8825 FPS vs C++ 26.0822 FPS, Python is 1.15x faster.
+- Plate YOLO: Python 37.6373 FPS vs C++ 31.0990 FPS, Python is 1.21x faster.
+- OCR: Python 0.4805 FPS vs C++ GPU 64.5509 FPS, C++ is 134.34x faster.
+- Total pipeline: Python 2.2061 FPS vs C++ GPU-OCR 13.6219 FPS, C++ is 6.17x faster.
+
+Note:
+- The OCR stages are not the same workload. The Python project entry uses PaddleOCR's full detection+recognition pipeline on each crop, while the C++ benchmark uses Paddle Inference recognizer ch_PP-OCRv4_rec_infer directly on plate crops.

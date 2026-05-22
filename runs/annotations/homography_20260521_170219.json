@@ -1,0 +1,47 @@
+{
+  "source": "E:\\pywork\\x-ii\\movie\\Car Catches on Fire at Witchita Apartment Parking Lot [oQmCTmGlwgA].mp4",
+  "frame_size": [
+    640,
+    360
+  ],
+  "homography": {
+    "image_points": [
+      [
+        159,
+        279
+      ],
+      [
+        262,
+        249
+      ],
+      [
+        103,
+        204
+      ],
+      [
+        176,
+        181
+      ]
+    ],
+    "point_order": "near-left, near-right, far-left, far-right",
+    "world_points": [
+      [
+        0,
+        0
+      ],
+      [
+        1.8,
+        0
+      ],
+      [
+        0,
+        4.8
+      ],
+      [
+        1.8,
+        4.8
+      ]
+    ],
+    "needs_world_points": false
+  }
+}
